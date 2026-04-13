@@ -1,0 +1,346 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "Nimbus API Documentation",
+    "version": "1.0.0",
+    "description": "API Documentation for Nimbus Multi-tenant System"
+  },
+  "servers": [
+    {
+      "url": "https://nimbus.casamedicagi.com/nimbus-apis/"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Users",
+      "description": "User management and authentication"
+    },
+    {
+      "name": "Products",
+      "description": "Product management"
+    },
+    {
+      "name": "Transactions",
+      "description": "Transaction processing"
+    },
+    {
+      "name": "Audit",
+      "description": "System audit logs"
+    },
+    {
+      "name": "Version",
+      "description": "System versioning"
+    }
+  ],
+  "paths": {
+    "/login-user": {
+      "post": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "User login",
+        "description": "Authenticates a user for a specific tenant and returns a JWT.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "email",
+                  "password",
+                  "tenant"
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "password": {
+                    "type": "string",
+                    "format": "password"
+                  },
+                  "tenant": {
+                    "type": "string",
+                    "description": "Tenant unique identifier"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "integer" },
+                    "token": { "type": "string" },
+                    "name": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Invalid credentials" },
+          "404": { "description": "User or Tenant not found" }
+        }
+      }
+    },
+    "/users": {
+      "get": {
+        "tags": ["Users"],
+        "summary": "Get all users",
+        "responses": { "200": { "description": "Success" } }
+      }
+    },
+    "/create-user": {
+      "post": {
+        "tags": ["Users"],
+        "summary": "Create a new user",
+        "responses": { "201": { "description": "Created" } }
+      }
+    },
+    "/register-user": {
+      "post": {
+        "tags": ["Users"],
+        "summary": "Register a new user",
+        "responses": { "201": { "description": "Registered" } }
+      }
+    },
+    "/delete-user": {
+      "delete": {
+        "tags": ["Users"],
+        "summary": "Delete a user",
+        "responses": { "200": { "description": "Deleted" } }
+      }
+    },
+    "/products": {
+      "get": {
+        "tags": ["Products"],
+        "summary": "Get all products",
+        "responses": { "200": { "description": "Success" } }
+      }
+    },
+    "/product-by-id": {
+      "get": {
+        "tags": ["Products"],
+        "summary": "Get product by ID",
+        "parameters": [{ "$ref": "#/components/parameters/id" }],
+        "responses": { "200": { "description": "Success" } }
+      }
+    },
+    "/create-product": {
+      "post": {
+        "tags": ["Products"],
+        "summary": "Create a new product",
+        "responses": { "201": { "description": "Created" } }
+      }
+    },
+    "/update-product": {
+      "patch": {
+        "tags": ["Products"],
+        "summary": "Update a product",
+        "responses": { "201": { "description": "Updated" } }
+      }
+    },
+    "/transactions": {
+      "get": {
+        "tags": ["Transactions"],
+        "summary": "Get all transactions",
+        "responses": { "200": { "description": "Success" } }
+      }
+    },
+    "/transaction-by-id": {
+      "get": {
+        "tags": ["Transactions"],
+        "summary": "Get transaction by ID",
+        "parameters": [{ "$ref": "#/components/parameters/id" }],
+        "responses": { "200": { "description": "Success" } }
+      }
+    },
+    "/create-transaction": {
+      "post": {
+        "tags": ["Transactions"],
+        "summary": "Create a new transaction",
+        "responses": { "201": { "description": "Created" } }
+      }
+    },
+    "/transaction-details": {
+      "get": {
+        "tags": ["Transactions"],
+        "summary": "Get transaction details",
+        "responses": { "200": { "description": "Success" } }
+      }
+    },
+    "/audit-logs": {
+      "get": {
+        "tags": ["Audit"],
+        "summary": "Get audit logs",
+        "responses": { "200": { "description": "Success" } }
+      }
+    },
+    "/system-versions": {
+      "get": {
+        "tags": ["Version"],
+        "summary": "Get system versions",
+        "responses": { "200": { "description": "Success" } }
+      }
+    },
+    "/verify-version-app": {
+      "get": {
+        "tags": ["Version"],
+        "summary": "Verify version app",
+        "responses": { "200": { "description": "Success" } }
+      }
+    },
+    "/dashboard-summary": {
+      "get": {
+        "tags": [
+          "Dashboard"
+        ],
+        "summary": "Get total accumulated balances",
+        "description": "Returns the grand total of 'Yo Debo' and 'Me Deben'.",
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "integer" },
+                    "body": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "me_deben": { "type": "number" },
+                          "yo_debo": { "type": "number" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contact-form": {
+      "post": {
+        "tags": ["Support"],
+        "summary": "Send contact form",
+        "responses": { "200": { "description": "Success" } }
+      }
+    },
+    "/create-payment": {
+      "post": {
+        "tags": ["Payments"],
+        "summary": "Create a new payment",
+        "responses": { "201": { "description": "Created" } }
+      }
+    },
+    "/update-payment": {
+      "patch": {
+        "tags": ["Payments"],
+        "summary": "Update a payment",
+        "responses": { "200": { "description": "Updated" } }
+      }
+    },
+    "/create-transaction-detail": {
+      "post": {
+        "tags": ["Transactions"],
+        "summary": "Create a new transaction detail",
+        "responses": { "201": { "description": "Created" } }
+      }
+    },
+    "/update-transaction": {
+      "patch": {
+        "tags": ["Transactions"],
+        "summary": "Update a transaction",
+        "responses": { "200": { "description": "Updated" } }
+      }
+    },
+    "/update-transaction-detail": {
+      "patch": {
+        "tags": ["Transactions"],
+        "summary": "Update a transaction detail",
+        "responses": { "200": { "description": "Updated" } }
+      }
+    },
+    "/create-system-version": {
+      "post": {
+        "tags": ["Version"],
+        "summary": "Create a new system version",
+        "responses": { "201": { "description": "Created" } }
+      }
+    },
+    "/update-system-version": {
+      "patch": {
+        "tags": ["Version"],
+        "summary": "Update a system version",
+        "responses": { "200": { "description": "Updated" } }
+      }
+    },
+    "/password-recovery": {
+      "post": {
+        "tags": ["Users"],
+        "summary": "Initiate password recovery",
+        "responses": { "200": { "description": "Success" } }
+      }
+    },
+    "/create-password": {
+      "post": {
+        "tags": ["Users"],
+        "summary": "Update user password",
+        "responses": { "200": { "description": "Updated" } }
+      }
+    },
+    "/update-user": {
+      "patch": {
+        "tags": ["Users"],
+        "summary": "Update user info",
+        "responses": { "200": { "description": "Updated" } }
+      }
+    },
+    "/update-level": {
+      "patch": {
+        "tags": ["System"],
+        "summary": "Update level info",
+        "responses": { "200": { "description": "Updated" } }
+      }
+    },
+    "/update-user-role": {
+      "patch": {
+        "tags": ["System"],
+        "summary": "Update user role",
+        "responses": { "200": { "description": "Updated" } }
+      }
+    }
+  },
+  "components": {
+    "parameters": {
+      "id": {
+        "name": "id",
+        "in": "query",
+        "required": true,
+        "description": "ID",
+        "schema": {
+          "type": "integer"
+        }
+      }
+    },
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  }
+}

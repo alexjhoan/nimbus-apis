@@ -1,0 +1,38 @@
+# Refactoring Base PHP API
+
+This plan outlines the steps to modernize the PHP API base, focusing on security, modularity, and maintainability.
+
+## User Review Required
+> [!IMPORTANT]
+> **Breaking Changes**: The directory structure for `routes` and `services` will change. [sqlProcedures.php](file:///d:/xampp/base-apis/sqlProcedures.php) will be deleted.
+> **Configuration**: Secrets (DB credentials, Tokens) will be moved to a configuration file that should **NOT** be committed to version control.
+
+## Proposed Changes
+
+### 1. Cleanup and Security
+#### [DELETE] [sqlProcedures.php](file:///d:/xampp/base-apis/sqlProcedures.php)
+- This file contains insecure SQL string concatenation and is actively unused (commented out in code).
+- **Action**: Delete the file.
+
+#### [MODIFY] [const.php](file:///d:/xampp/base-apis/const.php)
+- Enhance to look for a local configuration file (e.g., `config.local.php`) for secrets.
+- If the local file exists, load constants from there.
+- Add `config.local.php` to [.gitignore](file:///d:/xampp/base-apis/.gitignore).
+
+### 2. Modular Architecture
+#### [NEW] [Router.php](file:///d:/xampp/base-apis/routes/Router.php)
+- Create a `Router` class to handle URI parsing and dynamic dispatching.
+- Replace the giant `switch` statement in [routes.php](file:///d:/xampp/base-apis/routes/routes.php).
+
+#### [MODIFY] [routes/routes.php](file:///d:/xampp/base-apis/routes/routes.php)
+- Update to use the new `Router` class.
+- Register routes dynamically (e.g., `$router->get('/users', 'UserController::getAll')`).
+
+#### [Refactor Services]
+- Move logic from [services/get.php](file:///d:/xampp/base-apis/routes/services/get.php), [post.php](file:///d:/xampp/base-apis/routes/services/post.php) into dedicated Controllers inside `routes/controllers/`.
+- Example: `routes/controllers/UserController.php`.
+
+## Verification Plan
+### Manual Verification
+- **Test Endpoints**: Use Postman or CURL to verify that existing endpoints (`/users`, `/login`, etc.) still work after refactoring.
+- **Security Check**: Verify that sensitive tokens are not exposed in the source code.

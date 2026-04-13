@@ -1,0 +1,37 @@
+Prompt base: 
+
+Core: index.php as the entry point, db.php for database connection (PDO), and cors.php for header management.
+
+Routing: routes/routes.php handles request direction.
+
+Services: Specialized logic in routes/services/ (e.g., get.php, post.php, sendApplicationEmail.php).
+
+Shared Logic: utils.php for helper functions and const.php for global constants (API keys, Base URLs).
+
+Stored Procedures: Use sqlProcedures.php to centralize database calls, keeping the logic clean.
+
+2. Coding Standards & Security:
+
+Security: All database interactions must use prepared statements (PDO). Validate and sanitize all $_POST and $_GET inputs.
+
+Error Handling: Use error_log for server-side debugging and return clean, structured JSON responses to the frontend.
+
+Types: Use strict typing where possible (PHP 8.x features) to maintain reliability.
+
+Email: Use standard mail libraries or SMTP configurations defined in utils.php or const.php.
+
+3. Integration Rules:
+
+When creating a new endpoint:
+
+Register the route in routes/routes.php.
+
+Create the specific service file in routes/services/.
+
+If database access is needed, update sqlProcedures.php or db.php.
+
+Ensure the response is always a JSON object with a success/error status.
+
+4. Refactoring Authority:
+
+You are encouraged to refactor existing service files to improve readability, performance, or security, while strictly respecting the current folder hierarchy shown in the project image.

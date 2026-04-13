@@ -1,0 +1,11 @@
+CREATE TABLE IF NOT EXISTS currency_settings (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    rate_cop DECIMAL(15, 4) NOT NULL DEFAULT 3900.0000,
+    rate_ves DECIMAL(15, 4) NOT NULL DEFAULT 36.0000,
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Insert initial rates for the first time
+INSERT INTO currency_settings (rate_cop, rate_ves) 
+SELECT 3900.0000, 36.0000
+WHERE NOT EXISTS (SELECT 1 FROM currency_settings LIMIT 1);
