@@ -21,7 +21,7 @@ function getDataFromDB($item, $dbName = NULL)
     "transaction-by-id" => "SELECT * FROM transactions WHERE id = ?",
     "transaction-details-by-transaction" => "SELECT * FROM transaction_details WHERE transaction_id = ?",
     "audit_logs" => "SELECT * FROM audit_logs ORDER BY `id` DESC",
-    "system_versions" => "SELECT * FROM system_versions ORDER BY `id` DESC limit 1",
+    "system-versions" => "SELECT * FROM system_versions ORDER BY `id` DESC limit 1",
     "dashboard-summary" => "SELECT date, total_debt, total_credit FROM account_balances WHERE date >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH) ORDER BY date ASC",
   ];
 

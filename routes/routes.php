@@ -16,7 +16,7 @@ require_once 'controllers/SaleController.php';
 require_once 'controllers/PurchaseController.php';
 require_once 'controllers/PaymentController.php';
 require_once 'controllers/DispatchController.php';
-require_once 'controllers/DebtController.php';
+require_once 'controllers/BalanceController.php';
 require_once 'controllers/CurrencyController.php';
 require_once 'controllers/AbonoController.php';
 
@@ -31,7 +31,7 @@ $saleController = new SaleController();
 $purchaseController = new PurchaseController();
 $paymentController = new PaymentController();
 $dispatchController = new DispatchController();
-$debtController = new DebtController();
+$balanceController = new BalanceController();
 $currencyController = new CurrencyController();
 $abonoController = new AbonoController();
 
@@ -62,7 +62,7 @@ $router->get('/audit-logs', function () {
   getDataFromDB('audit_logs');
 });
 $router->get('/system-versions', function () {
-  getDataFromDB('system_versions', 'main');
+  getDataFromDB('system-versions', "nimbus");
 });
 $router->get('/dashboard-summary', function () {
   getDataFromDB('dashboard-summary');
@@ -71,6 +71,7 @@ $router->get('/dashboard-summary', function () {
 // Contacts
 $router->get('/contacts', [$contactController, 'getAll']);
 $router->get('/contact-by-id', [$contactController, 'getById']);
+$router->get('/contact-balance', [$balanceController, 'getContactBalance']);
 
 // Sales
 $router->get('/sales', [$saleController, 'getAll']);
@@ -88,9 +89,7 @@ $router->get('/payment-by-id', [$paymentController, 'getById']);
 $router->get('/dispatches', [$dispatchController, 'getAll']);
 $router->get('/dispatch-by-id', [$dispatchController, 'getById']);
 
-// Debts
-$router->get('/debts', [$debtController, 'getAll']);
-$router->get('/debt-by-id', [$debtController, 'getById']);
+$router->get('/debt-directory', [$balanceController, 'getDirectory']);
 $router->get('/get-rates', [$currencyController, 'getRates']);
 
 // Abonos
@@ -135,7 +134,7 @@ $router->post('/create-purchase', [$purchaseController, 'create']);
 $router->post('/update-purchase', [$purchaseController, 'update']);
 $router->post('/create-payment', [$paymentController, 'create']);
 $router->post('/create-dispatch', [$dispatchController, 'create']);
-$router->post('/create-debt', [$debtController, 'create']);
+
 $router->post('/create-abono', [$abonoController, 'create']);
 $router->post('/update-rates', [$currencyController, 'updateRates']);
 $router->post('/update-user', function () {
@@ -192,7 +191,7 @@ $router->delete('/delete-sale', [$saleController, 'delete']);
 $router->delete('/delete-purchase', [$purchaseController, 'delete']);
 $router->delete('/delete-payment', [$paymentController, 'delete']);
 $router->delete('/delete-dispatch', [$dispatchController, 'delete']);
-$router->delete('/delete-debt', [$debtController, 'delete']);
+
 $router->delete('/delete-abono', [$abonoController, 'delete']);
 
 $router->dispatch();

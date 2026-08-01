@@ -96,7 +96,7 @@ class PaymentController extends Controller
     }
 
     $db = DataBase::getConnection();
-    $stmt = $db->prepare("INSERT INTO payments (payment_date, contact_id, amount, method, detail, sale_id, purchase_id, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt = $db->prepare("INSERT INTO payments (payment_date, contact_id, amount, method, detail, sale_id, purchase_id, status, currency) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
     
     $date = $data['payment_date'] ?? date('Y-m-d');
     $contactId = $data['contact_id'];
@@ -106,12 +106,15 @@ class PaymentController extends Controller
     $saleId = $data['sale_id'] ?? null;
     $purchaseId = $data['purchase_id'] ?? null;
     $status = 'Activo';
+    $currency = $data['currency'] ?? 'USD';
 
-    $stmt->bind_param("sidssiis", $date, $contactId, $amount, $method, $detail, $saleId, $purchaseId, $status);
+    $stmt->bind_param("sidssiiss", $date, $contactId, $amount, $method, $detail, $saleId, $purchaseId, $status, $currency);
 
     try {
       $stmt->execute();
-      $this->jsonResponse(['id' => $stmt->insert_id], 201, 'Payment created successfully');
+      $insertedId = $stmt->insert_id;
+      Utils::refreshContactBalance($contactId);
+      $this->jsonResponse(['id' => $insertedId], 201, 'Payment created successfully');
     } catch (Exception $e) {
       $this->jsonResponse([], 500, $e->getMessage());
     }
@@ -139,6 +142,15 @@ class PaymentController extends Controller
 
     try {
       $stmt->execute();
+
+      // Get contact_id to refresh balance
+      $stmtInfo = $db->prepare("SELECT contact_id FROM payments WHERE id = ?");
+      $stmtInfo->bind_param("i", $id);
+      $stmtInfo->execute();
+      if ($row = $stmtInfo->get_result()->fetch_assoc()) {
+          Utils::refreshContactBalance($row['contact_id']);
+      }
+
       $this->jsonResponse([], 200, 'Payment deactivated');
     } catch (Exception $e) {
       $this->jsonResponse([], 500, $e->getMessage());

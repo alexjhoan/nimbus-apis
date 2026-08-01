@@ -90,7 +90,7 @@ class DispatchController extends Controller
     $data = $this->getBody();
 
     if (empty($data['contact']) || empty($data['total'])) {
-      $this->jsonResponse([], 400, 'Contact ID and Total are required');
+      $this->jsonResponse([], 400, 'Contacto y Total son requeridos');
     }
 
     $db = DataBase::getConnection();
@@ -100,23 +100,35 @@ class DispatchController extends Controller
       $contactName = $contact['name'] ?? '';
 
       // Create contact if it doesn't exist
-      if (empty($contactId)) {
-        $stmtContact = $db->prepare("INSERT INTO contacts (name, type, status) VALUES (?, ?, ?)");
-        $type = 'proveedor';
-        $status = 'Activo';
-        $stmtContact->bind_param("sss", $contactName, $type, $status);
-        $stmtContact->execute();
-        $contactId = $stmtContact->insert_id;
+      if (empty($contactId) && !empty($contactName)) {
+        // First check if it already exists by name
+        $stmtCheck = $db->prepare("SELECT id FROM contacts WHERE name = ? LIMIT 1");
+        $stmtCheck->bind_param("s", $contactName);
+        $stmtCheck->execute();
+        $resCheck = $stmtCheck->get_result();
+
+        if ($rowCheck = $resCheck->fetch_assoc()) {
+          $contactId = $rowCheck['id'];
+        } else {
+          $stmtContact = $db->prepare("INSERT INTO contacts (name, type, status, currency) VALUES (?, ?, ?, ?)");
+          $type = 'proveedor';
+          $status = 'Activo';
+          $currency = $data['currency'] ?? 'USD';
+          $stmtContact->bind_param("ssss", $contactName, $type, $status, $currency);
+          $stmtContact->execute();
+          $contactId = $stmtContact->insert_id;
+        }
       }
-      $stmt = $db->prepare("INSERT INTO dispatches (dispatch_date, contact_id, contact_name, total, detail, paid, status) VALUES (?, ?, ?, ?, ?, ?, ?)");
+      $stmt = $db->prepare("INSERT INTO dispatches (dispatch_date, contact_id, contact_name, total, detail, paid, status, currency) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
 
       $date = $data['dispatch_date'] ?? date('Y-m-d');
       $total = $data['total'];
       $detail = $data['detail'] ?? '';
       $paid = (bool) ($data['paid'] ?? false);
       $status = 'Activo';
+      $currency = $data['currency'] ?? 'USD';
 
-      $stmt->bind_param("sisdsis", $date, $contactId, $contactName, $total, $detail, $paid, $status);
+      $stmt->bind_param("sisdsiss", $date, $contactId, $contactName, $total, $detail, $paid, $status, $currency);
 
       $stmt->execute();
       $this->jsonResponse(['id' => $stmt->insert_id], 201, 'Dispatch created successfully');

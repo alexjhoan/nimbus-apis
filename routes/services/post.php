@@ -127,6 +127,12 @@ function postData($item)
               Utils::updateDailyBalance($date);
           }
       }
+
+      // Update Contact Balance if applicable
+      $contactId = $post['contact_id'] ?? ($post['contact']['id'] ?? null);
+      if ($contactId && in_array($table[$item], ['sales', 'purchases', 'payments', 'abonos', 'transactions'])) {
+          Utils::refreshContactBalance($contactId);
+      }
       echo json_encode([
         'status' => 201,
         'body' => ['id' => $insertedId],

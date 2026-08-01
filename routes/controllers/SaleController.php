@@ -39,6 +39,7 @@ class SaleController extends Controller
 
     $sales = [];
     while ($row = $result->fetch_assoc()) {
+      $row['items'] = isset($row['items']) ? json_decode($row['items'], true) : [];
       $sales[] = $row;
     }
 
@@ -123,25 +124,27 @@ class SaleController extends Controller
       $contactId = $contact['id'] ?? null;
       $contactName = $contact['name'] ?? '';
 
+      $currency = $data['currency'] ?? 'USD';
+
       // Create contact if it doesn't exist
       if (empty($contactId)) {
-        $stmtContact = $db->prepare("INSERT INTO contacts (name, type, status) VALUES (?, ?, ?)");
+        $stmtContact = $db->prepare("INSERT INTO contacts (name, type, status, currency) VALUES (?, ?, ?, ?)");
         $type = 'cliente';
         $status = 'Activo';
-        $stmtContact->bind_param("sss", $contactName, $type, $status);
+        $stmtContact->bind_param("ssss", $contactName, $type, $status, $currency);
         $stmtContact->execute();
         $contactId = $stmtContact->insert_id;
       }
 
       // 1. Insert Master
-      $stmt = $db->prepare("INSERT INTO sales (sale_date, contact_id, contact_name, total, items, payment_type, status) VALUES (?, ?, ?, ?, ?, ?, ?)");
+      $stmt = $db->prepare("INSERT INTO sales (sale_date, contact_id, contact_name, total, items, payment_type, status, currency) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
       $saleDate = $data['sale_date'] ?? date('Y-m-d');
       $total = $data['total'];
       $items = json_encode($data['items'] ?? []);
       $paymentType = $data['payment_type'] ?? 'contado';
       $status = ($paymentType === 'credito') ? 'Por Pagar' : 'Pagado';
 
-      $stmt->bind_param("sisdsss", $saleDate, $contactId, $contactName, $total, $items, $paymentType, $status);
+      $stmt->bind_param("sisdssss", $saleDate, $contactId, $contactName, $total, $items, $paymentType, $status, $currency);
       $stmt->execute();
       $saleId = $stmt->insert_id;
 
@@ -149,6 +152,7 @@ class SaleController extends Controller
       if ($paymentType === 'credito') {
         Utils::updateDailyBalance($saleDate);
       }
+      Utils::refreshContactBalance($contactId);
       $this->jsonResponse(['id' => $saleId], 201, 'Sale created successfully');
     } catch (Exception $e) {
       $db->rollback();
@@ -212,6 +216,7 @@ class SaleController extends Controller
         if ($row['payment_type'] === 'credito' || $newPaymentType === 'credito') {
           Utils::updateDailyBalance($row['sale_date']);
         }
+        Utils::refreshContactBalance($row['contact_id'] ?? null);
       }
 
       $this->jsonResponse([], 200, 'Updated successfully');
@@ -251,6 +256,7 @@ class SaleController extends Controller
         if ($row['payment_type'] === 'credito') {
           Utils::updateDailyBalance($row['sale_date']);
         }
+        Utils::refreshContactBalance($row['contact_id'] ?? null);
       }
 
       $this->jsonResponse([], 200, 'Sale deactivated');

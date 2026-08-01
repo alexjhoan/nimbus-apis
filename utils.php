@@ -322,16 +322,20 @@ class Utils
   {
     $db = DataBase::getConnection();
     try {
+      // Normalize date to Y-m-d to handle datetimes or ISO strings like '2026-05-18T17:14'
+      $timestamp = strtotime($date);
+      $normalizedDate = $timestamp ? date('Y-m-d', $timestamp) : $date;
+
       // Calculate total_debt (Me Deben - Sales)
-      $stmtSales = $db->prepare("SELECT SUM(total) as total FROM sales WHERE sale_date = ? AND status != 'Inactivo' AND payment_type = 'credito'");
-      $stmtSales->bind_param("s", $date);
+      $stmtSales = $db->prepare("SELECT SUM(total) as total FROM sales WHERE DATE(sale_date) = ? AND status != 'Inactivo' AND payment_type = 'credito'");
+      $stmtSales->bind_param("s", $normalizedDate);
       $stmtSales->execute();
       $resSales = $stmtSales->get_result()->fetch_assoc();
       $totalDebt = $resSales['total'] ?? 0;
 
       // Calculate total_credit (Yo Debo - Purchases)
-      $stmtPurchases = $db->prepare("SELECT SUM(total) as total FROM purchases WHERE purchase_date = ? AND status != 'Inactivo' AND payment_type = 'credito'");
-      $stmtPurchases->bind_param("s", $date);
+      $stmtPurchases = $db->prepare("SELECT SUM(total) as total FROM purchases WHERE DATE(purchase_date) = ? AND status != 'Inactivo' AND payment_type = 'credito'");
+      $stmtPurchases->bind_param("s", $normalizedDate);
       $stmtPurchases->execute();
       $resPurchases = $stmtPurchases->get_result()->fetch_assoc();
       $totalCredit = $resPurchases['total'] ?? 0;
@@ -340,10 +344,56 @@ class Utils
       $sql = "INSERT INTO account_balances (date, total_debt, total_credit) VALUES (?, ?, ?) 
               ON DUPLICATE KEY UPDATE total_debt = VALUES(total_debt), total_credit = VALUES(total_credit)";
       $stmtUpsert = $db->prepare($sql);
-      $stmtUpsert->bind_param("sdd", $date, $totalDebt, $totalCredit);
+      $stmtUpsert->bind_param("sdd", $normalizedDate, $totalDebt, $totalCredit);
       $stmtUpsert->execute();
     } catch (Exception $e) {
       error_log("Error in updateDailyBalance: " . $e->getMessage());
+    } finally {
+      if (isset($db)) $db->close();
+    }
+  }
+
+  static function refreshContactBalance($contact_id)
+  {
+    if (!$contact_id) return;
+    $db = DataBase::getConnection();
+    try {
+      // Get contact type and currency
+      $stmtContact = $db->prepare("SELECT type, currency FROM contacts WHERE id = ?");
+      $stmtContact->bind_param("i", $contact_id);
+      $stmtContact->execute();
+      $contactRes = $stmtContact->get_result()->fetch_assoc();
+      $type = $contactRes['type'] ?? 'cliente';
+      $currency = $contactRes['currency'] ?? 'USD';
+
+      // Recalculate total_debt (cobrar) - Sum Sales (Credit) - Abonos
+      $sqlDebt = "SELECT (
+                    (SELECT COALESCE(SUM(total), 0) FROM sales WHERE contact_id = ? AND payment_type = 'credito' AND status != 'Inactivo') - 
+                    (SELECT COALESCE(SUM(total), 0) FROM abonos WHERE contact_id = ? AND status = 'Activo')
+                  ) as total_debt";
+      $stmtDebt = $db->prepare($sqlDebt);
+      $stmtDebt->bind_param("ii", $contact_id, $contact_id);
+      $stmtDebt->execute();
+      $totalDebt = $stmtDebt->get_result()->fetch_assoc()['total_debt'] ?? 0;
+
+      // Recalculate total_credit (pagar) - Sum Purchases (Credit) - Payments
+      $sqlCredit = "SELECT (
+                    (SELECT COALESCE(SUM(total), 0) FROM purchases WHERE contact_id = ? AND payment_type = 'credito' AND status != 'Inactivo') - 
+                    (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE contact_id = ? AND status = 'Activo')
+                  ) as total_credit";
+      $stmtCredit = $db->prepare($sqlCredit);
+      $stmtCredit->bind_param("ii", $contact_id, $contact_id);
+      $stmtCredit->execute();
+      $totalCredit = $stmtCredit->get_result()->fetch_assoc()['total_credit'] ?? 0;
+
+      // Upsert into contact_balances
+      $sqlUpsert = "INSERT INTO contact_balances (contact_id, total_debt, total_credit, type, currency) VALUES (?, ?, ?, ?, ?) 
+                    ON DUPLICATE KEY UPDATE total_debt = VALUES(total_debt), total_credit = VALUES(total_credit), type = VALUES(type), currency = VALUES(currency)";
+      $stmtUpsert = $db->prepare($sqlUpsert);
+      $stmtUpsert->bind_param("iddss", $contact_id, $totalDebt, $totalCredit, $type, $currency);
+      $stmtUpsert->execute();
+    } catch (Exception $e) {
+      error_log("Error in refreshContactBalance: " . $e->getMessage());
     } finally {
       if (isset($db)) $db->close();
     }

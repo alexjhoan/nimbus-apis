@@ -39,6 +39,7 @@ class PurchaseController extends Controller
 
     $purchases = [];
     while ($row = $result->fetch_assoc()) {
+      $row['items'] = isset($row['items']) ? json_decode($row['items'], true) : [];
       $purchases[] = $row;
     }
 
@@ -122,17 +123,20 @@ class PurchaseController extends Controller
       $contactId = $contact['id'] ?? null;
       $contactName = $contact['name'] ?? '';
 
+      $currency = $data['currency'] ?? 'USD';
+
       // Create contact if it doesn't exist
-      if (empty($contactId)) {
-        $stmtContact = $db->prepare("INSERT INTO contacts (name, type, status) VALUES (?, ?, ?)");
+      if (!$contactId) {
+        $stmtContact = $db->prepare("INSERT INTO contacts (name, type, status, currency) VALUES (?, ?, ?, ?)");
+        $currency = $data['currency'] ?? 'USD';
         $type = 'proveedor';
         $status = 'Activo';
-        $stmtContact->bind_param("sss", $contactName, $type, $status);
+        $stmtContact->bind_param("ssss", $contactName, $type, $status, $currency);
         $stmtContact->execute();
         $contactId = $stmtContact->insert_id;
       }
 
-      $stmt = $db->prepare("INSERT INTO purchases (purchase_date, contact_id, contact_name, total, items, ref_invoice, status, payment_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+      $stmt = $db->prepare("INSERT INTO purchases (purchase_date, contact_id, contact_name, total, items, ref_invoice, status, payment_type, currency) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
       $date = $data['purchase_date'] ?? date('Y-m-d');
       $total = $data['total'];
       $items = json_encode($data['items'] ?? []);
@@ -140,7 +144,7 @@ class PurchaseController extends Controller
       $paymentType = $data['payment_type'] ?? 'contado';
       $status = ($paymentType === 'credito') ? 'Por Pagar' : 'Pagado';
 
-      $stmt->bind_param("sisdssss", $date, $contactId, $contactName, $total, $items, $refInvoice, $status, $paymentType);
+      $stmt->bind_param("sisdsssss", $date, $contactId, $contactName, $total, $items, $refInvoice, $status, $paymentType, $currency);
       $stmt->execute();
       $purchaseId = $stmt->insert_id;
 
@@ -148,7 +152,8 @@ class PurchaseController extends Controller
       if ($paymentType === 'credito') {
         Utils::updateDailyBalance($date);
       }
-      $this->jsonResponse(['id' => $purchaseId], 201, 'Purchase created successfully');
+      Utils::refreshContactBalance($contactId);
+      $this->jsonResponse(['id' => $purchaseId], 201, 'Compra creada exitosamente');
     } catch (Exception $e) {
       $db->rollback();
       $this->jsonResponse([], 500, $e->getMessage());
@@ -216,6 +221,7 @@ class PurchaseController extends Controller
         if ($row['payment_type'] === 'credito' || $newPaymentType === 'credito') {
           Utils::updateDailyBalance($row['purchase_date']);
         }
+        Utils::refreshContactBalance($row['contact_id'] ?? null);
       }
 
       $this->jsonResponse([], 200, 'Updated successfully');
@@ -255,6 +261,7 @@ class PurchaseController extends Controller
         if ($row['payment_type'] === 'credito') {
           Utils::updateDailyBalance($row['purchase_date']);
         }
+        Utils::refreshContactBalance($row['contact_id'] ?? null);
       }
 
       $this->jsonResponse([], 200, 'Purchase deactivated');

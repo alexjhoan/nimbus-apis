@@ -36,7 +36,7 @@ class UserController extends Controller
    */
   public function getAll()
   {
-    $db = DataBase::getConnection();
+    $db = DataBase::getConnection("nimbus");
     $sql = "SELECT * FROM users ORDER BY `id` DESC";
     $result = $db->query($sql);
 
@@ -79,7 +79,7 @@ class UserController extends Controller
     }
 
     $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
-    $db = DataBase::getConnection();
+    $db = DataBase::getConnection("nimbus");
     $stmt = $db->prepare("SELECT * FROM users WHERE id = ?");
     $stmt->bind_param('i', $id);
     $stmt->execute();
@@ -131,7 +131,7 @@ class UserController extends Controller
 
     $passwordHash = password_hash($data['password'], PASSWORD_BCRYPT);
 
-    $db = DataBase::getConnection();
+    $db = DataBase::getConnection("nimbus");
     $stmt = $db->prepare("INSERT INTO users (first_name, last_name, email, password, phone, address, user_role_id, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
 
     $firstName = $data['first_name'] ?? '';
@@ -159,10 +159,9 @@ class UserController extends Controller
    *     @OA\RequestBody(
    *         required=true,
    *         @OA\JsonContent(
-   *             required={"email","password","tenant"},
-   *             @OA\Property(property="email", type="string", format="email"),
-   *             @OA\Property(property="password", type="string", format="password"),
-   *             @OA\Property(property="tenant", type="string")
+   *             required={"identity","password"},
+   *             @OA\Property(property="identity", type="string", description="Email o Nickname del usuario"),
+   *             @OA\Property(property="password", type="string", format="password")
    *         )
    *     ),
    *     @OA\Response(
@@ -181,31 +180,71 @@ class UserController extends Controller
   public function login()
   {
     $data = $this->getBody();
-    $tenantName = $data['tenant'] ?? ''; // Renamed from 'comercio' as per user request
-    $email = $data['email'] ?? '';
+    // Aceptamos 'identity' (email o nickname), con fallback a 'email' por compatibilidad con el frontend actual
+    $identity = $data['identity'] ?? $data['email'] ?? '';
     $password = $data['password'] ?? '';
 
-    if (empty($tenantName)) {
-      $this->jsonResponse([], 400, 'El campo tenant es requerido');
+    if (empty($identity)) {
+      $this->jsonResponse([], 400, 'El campo email o nickname es requerido');
     }
 
-    // 1. Validar que el comercio se encuentra dentro de la tabla tenants en la BD principal
-    $tenantExist = Utils::isRecordExists("tenants", "name", $tenantName, 'nimbus');
+    if (empty($password)) {
+      $this->jsonResponse([], 400, 'La contraseña es requerida');
+    }
+
+    // 1. Buscar en global_users_map el tenant_db_name usando la identidad (email o nickname)
+    $dbAdmin = DataBase::getConnection('nimbus');
+    $stmtAdmin = $dbAdmin->prepare("SELECT tenant_db_name, status FROM global_users_map WHERE (email = ? OR nickname = ?) LIMIT 1");
+    $stmtAdmin->bind_param("ss", $identity, $identity);
+    $stmtAdmin->execute();
+    $resultAdmin = $stmtAdmin->get_result();
+
+    if ($resultAdmin->num_rows === 0) {
+      $this->jsonResponse([], 404, "El usuario no existe");
+    }
+
+    $globalUser = $resultAdmin->fetch_assoc();
+
+    if ($globalUser['status'] != "active") {
+      $this->jsonResponse([], 401, "El acceso para este usuario está inactivo");
+    }
+
+    $tenancyDbName = $globalUser['tenant_db_name'];
+
+    // 2. Obtener los datos del tenant desde la BD nimbus usando el tenancy_db_name
+    $tenantExist = Utils::isRecordExists("tenants", "tenancy_db_name", $tenancyDbName, 'nimbus');
 
     if (!$tenantExist["boolean"]) {
-      $this->jsonResponse([], 404, "El comercio '{$tenantName}' no existe");
+      $this->jsonResponse([], 404, "El comercio asociado a este usuario no existe");
     }
 
     $tenantData = $tenantExist["data"];
-    $tenancyDbName = $tenantData['tenancy_db_name'];
+    $tenantName = $tenantData['name'];
 
-    // 2. Buscar el usuario dentro de la tabla users dentro de la base de datos del comercio
-    $userExist = Utils::isRecordExists("users", "email", $email, $tenancyDbName);
+    // 3. Buscar el usuario dentro de la tabla users dentro de la base de datos del comercio
+    $dbTenant = DataBase::getConnection($tenancyDbName);
 
-    if ($userExist["boolean"]) {
-      $user = $userExist["data"];
+    // Intentamos buscar por email o nickname si la columna existe, sino fallback a solo email
+    $stmtUser = $dbTenant->prepare("SELECT * FROM users WHERE email = ? OR nickname = ? LIMIT 1");
+    if (!$stmtUser) {
+      $stmtUser = $dbTenant->prepare("SELECT * FROM users WHERE email = ? LIMIT 1");
+      $stmtUser->bind_param("s", $identity);
+    } else {
+      $stmtUser->bind_param("ss", $identity, $identity);
+    }
 
-      // 3. Validar la contraseña
+    $stmtUser->execute();
+    $resultUser = $stmtUser->get_result();
+
+    if ($resultUser->num_rows > 0) {
+      $user = $resultUser->fetch_assoc();
+
+      $userStatus = $user['status'] ?? $user['active'] ?? 1;
+      if ($userStatus != 1) {
+        $this->jsonResponse([], 401, 'El acceso para este usuario está inactivo en el sistema local');
+      }
+
+      // 4. Validar la contraseña
       if (password_verify($password, $user['password'])) {
         $token = Utils::JwtEncode([
           'id' => $user['id'],
@@ -222,10 +261,9 @@ class UserController extends Controller
         ]);
 
         // Actualizar el token en la base de datos del comercio
-        $db = DataBase::getConnection($tenancyDbName);
-        $stmt = $db->prepare("UPDATE users SET user_token=?, exp_token=? WHERE id = ?");
-        $stmt->bind_param("ssi", $token['jwt'], $token['exp'], $user['id']);
-        $stmt->execute();
+        $stmtUpdate = $dbTenant->prepare("UPDATE users SET user_token=?, exp_token=? WHERE id = ?");
+        $stmtUpdate->bind_param("ssi", $token['jwt'], $token['exp'], $user['id']);
+        $stmtUpdate->execute();
 
         $responseBody = [
           'id' => $user['id'],
@@ -234,8 +272,8 @@ class UserController extends Controller
           'first_name' => $user['first_name'],
           'last_name' => $user['last_name'],
           'role_id' => $user['role_id'],
-          'role_name' => $user['role_name'],
-          'status' => $user['status'],
+          'role_name' => $user['role_name'] ?? null,
+          'status' => $user['status'] ?? null,
           'tenant' => $tenantName
         ];
 

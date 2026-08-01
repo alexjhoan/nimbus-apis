@@ -90,13 +90,14 @@ class ContactController extends Controller
     }
 
     $db = DataBase::getConnection();
-    $stmt = $db->prepare("INSERT INTO contacts (name, type, status) VALUES (?, ?, ?)");
-    
+    $stmt = $db->prepare("INSERT INTO contacts (name, type, status, currency) VALUES (?, ?, ?, ?)");
+
     $name = $data['name'];
     $type = $data['type'] ?? 'cliente';
     $status = 'Activo';
+    $currency = $data['currency'] ?? 'USD';
 
-    $stmt->bind_param("sss", $name, $type, $status);
+    $stmt->bind_param("ssss", $name, $type, $status, $currency);
 
     try {
       $stmt->execute();
@@ -133,7 +134,7 @@ class ContactController extends Controller
 
     $db = DataBase::getConnection();
     $id = $data['id'];
-    
+
     // Build update query dynamically
     $fields = [];
     $params = [];
@@ -147,6 +148,11 @@ class ContactController extends Controller
     if (isset($data['type'])) {
       $fields[] = "type = ?";
       $params[] = $data['type'];
+      $types .= "s";
+    }
+    if (isset($data['currency'])) {
+      $fields[] = "currency = ?";
+      $params[] = $data['currency'];
       $types .= "s";
     }
 

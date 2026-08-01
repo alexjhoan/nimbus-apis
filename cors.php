@@ -1,23 +1,21 @@
 <?php
 
 $allowed_domains = [
-  'https://bwtne.com',
-  'https://helpers.bluewayisbetter.com',
-  'https://helpers.bwtne.com',
-  'https://v1.bwtne.com',
+  "https://nimbus.opticalab.net",
   'http://localhost:3000'
 ];
 
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
 
-// Check if origin is allowed
-if (in_array($origin, $allowed_domains)) {
-  header("Access-Control-Allow-Origin: " . $origin);
-} else {
-  // Default fallback
-  header("Access-Control-Allow-Origin: https://nimbus.casamedicagi.com");
-}
+// // Check if origin is allowed
+// if (in_array($origin, $allowed_domains)) {
+//   header("Access-Control-Allow-Origin: " . $origin);
+// } else {
+//   // Default fallback
+//   header("Access-Control-Allow-Origin: https://nimbus.opticalab.net");
+//   }
 
+header("Access-Control-Allow-Origin: *");
 header("Vary: Origin");
 header("Content-Type: application/json; charset=UTF-8");
 header("Access-Control-Allow-Methods: OPTIONS,GET,PUT,POST,DELETE");
